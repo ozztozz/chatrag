@@ -16,7 +16,6 @@ env/
 api.txt
 # Django
 *.log
-db.sqlite3
 media/
 staticfiles/
 
