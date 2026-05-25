@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pdb
+*.egg-info/
+*.egg
+*.env
+.env
+.venv
+venv/
+ENV/
+env/
+
+# Django
+*.log
+db.sqlite3
+media/
+staticfiles/
+
+# VS Code
+.vscode/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Virtual environments
+my_env/
+
+# Other
+*.bak
+*.swp
+*.swo
+
+# Ignore secrets
+*.env
+.env.*
+
+# Ignore test coverage
+htmlcov/
+.coverage
+.coverage.*
+.cache
+
+# Ignore build
+build/
+dist/
+*.egg-info/
