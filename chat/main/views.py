@@ -15,7 +15,7 @@ def instagram_webhook(request):
         token = request.GET.get('hub.verify_token')
         challenge = request.GET.get('hub.challenge')
 
-        if mode == 'subscribe' and token == VERIFY_TOKEN:
+        if mode == 'subscribe' and token == 'fkalpha_academy':
             return HttpResponse(challenge, content_type="text/plain")
         return HttpResponse("Doğrulama başarısız", status=403)
 

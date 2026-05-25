@@ -23,12 +23,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 import os
 from dotenv import load_dotenv
 load_dotenv()
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+SECRET_KEY = 'django-insecure-ghe#5f^h(jl3u@jr979w=32w+solilheobqy#k(58)#ow=c#pr'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['fkalphaswimacademy.pythonanywhere.com', 'localhost', '127.0.0.1']
 
 
 # Application definition
