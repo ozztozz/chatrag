@@ -13,7 +13,7 @@ __pycache__/
 venv/
 ENV/
 env/
-
+api.txt
 # Django
 *.log
 db.sqlite3
