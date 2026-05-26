@@ -252,16 +252,18 @@ Kullanıcının adı {name.title()}. Konuşma sırasında kullanıcıya ismiyle 
                 temperature=0.3 # Bilgi tabanına sadık kalması için yaratıcılığı düşürdük
             )
         )
-    for i in range(0,10):
-        while True:
-            try:
-                response = chat.send_message(new_message)  # Son user mesajını gönderiyoruz
-                break
-            except ClientError as e:
+    for i in range(0,5):
+        
+        try:
+            response = chat.send_message(new_message)  # Son user mesajını gönderiyoruz
+            
+        except ClientError as e:
                 # 429 durum kodunu kontrol ediyoruz (Resource Exhausted)
-                if e.code == 429:
-                    time.sleep(30)  # 30 saniye bekle
-                    continue
+            if e.code == 429:
+                time.sleep(i * 20)  # 30 saniye bekle
+                continue
+        else:
+            break
     return response.text
 
 def get_instagram_user_info(instagram_id):
