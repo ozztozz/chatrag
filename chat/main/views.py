@@ -5,12 +5,14 @@ from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from .models import InstagramUser, InstagramMessage
 from google.genai import types
+import os
+from django.conf import settings
 
 
 
 def get_old_messages(user_obj, limit=10):
-    
-    with open("alpha_chat.txt", "r", encoding="utf-8") as f:
+    knowledge_file_path = os.path.join(settings.BASE_DIR, 'main', 'alpha_chat.txt')
+    with open(knowledge_file_path, "r", encoding="utf-8") as f:
         data = f.read()
     eski_mesajlar = []
     eski_mesajlar.append(
@@ -47,7 +49,9 @@ def get_old_messages(user_obj, limit=10):
     return eski_mesajlar
 
 def get_gemini_messages(user_obj,new_message ,limit=10):
-    with open("alpha_prompt.txt", "r", encoding="utf-8") as f:
+    prompt_file_path = os.path.join(settings.BASE_DIR, 'main', 'alpha_prompt.txt')
+    
+    with open(prompt_file_path, "r", encoding="utf-8") as f:
         prompt = f.read()
     client = genai.Client(api_key='AIzaSyCAIjIN1mdXHNZgxknmcSMlb_TQIytquCI')
 
