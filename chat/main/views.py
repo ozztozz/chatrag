@@ -73,7 +73,7 @@ def instagram_webhook(request):
         token = request.GET.get('hub.verify_token')
         challenge = request.GET.get('hub.challenge')
 
-        if mode == 'subscribe' and token == :
+        if mode == 'subscribe' and token == 'alphaacademyverifytoken' :
             return HttpResponse(challenge, content_type="text/plain")
         return HttpResponse("Doğrulama başarısız", status=403)
 
