@@ -236,7 +236,7 @@ sporcu ve veli adını kaydet
 telefonu kaydet
 
 """
-    client = genai.Client(api_key='AIzaSyA2I9jijJMOPyIMSzsbwD8gputfk94O8kA')
+    client = genai.Client(api_key='AIzaSyClPfp8y1h0oDGGyBQRlXlPGPoej_zyTEk')
 
 
     old_messages_data = get_old_messages(user_obj, limit=limit)
@@ -292,7 +292,7 @@ def instagram_webhook(request):
                             
                             # KULLANICIYI KAYDET (Yoksa oluşturur, varsa mevcut olanı getirir)
                             user_obj, created = InstagramUser.objects.get_or_create(instagram_id=sender_id)
-                            if created:
+                            if created or user_obj.name is None:  # Yeni kullanıcıysa veya adı yoksa bilgileri çek
                                 try:
                                     user_info = get_instagram_user_info(sender_id)
                                     user_obj.name = user_info.get('name')
@@ -301,7 +301,9 @@ def instagram_webhook(request):
                                     user_obj.save()
                                 except Exception as e:
                                    pass
-        
+                            if user_obj.is_user_follow_business:
+                                return HttpResponse("EVENT_RECEIVED", status=200) # Takip eden kullanıcılar için yanıt vermiyoruz
+                            
                             reply_text = get_gemini_messages(user_obj, message_text)  
                             # GELEN MESAJI KAYDET (Aynı message_id daha önce işlenmediyse)
                             if not InstagramMessage.objects.filter(message_id=message_id).exists():
