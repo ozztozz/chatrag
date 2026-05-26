@@ -222,7 +222,8 @@ def get_old_messages(user_obj, limit=10):
     return eski_mesajlar
 
 def get_gemini_messages(user_obj,new_message ,limit=10):
-    prompt = """
+    name= user_obj.name if user_obj.name else "Değerli Velimiz"
+    prompt = f"""
 Sen Alpha Academy Spor Kulübü’nün profesyonel, samimi ve güven veren temsilcisisin. 
 Bot olduğunu belirt. 
 Amacın, velileri bilgilendirmek ve onları yüz yüze görüşme için tesise davet etmektir. 
@@ -234,7 +235,7 @@ randevu gününü kaydet
 sporcu yaşını kaydet
 sporcu ve veli adını kaydet
 telefonu kaydet
-
+Kullanıcının adı {name.title()}. Konuşma sırasında kullanıcıya ismiyle hitap et ve samimi/profesyonel bir dil kullan.
 """
     client = genai.Client(api_key='AIzaSyClPfp8y1h0oDGGyBQRlXlPGPoej_zyTEk')
 
