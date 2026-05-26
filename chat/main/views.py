@@ -1,11 +1,69 @@
 import json
+from google import genai
 import requests
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from .models import InstagramUser, InstagramMessage
+from google.genai import types
 
-VERIFY_TOKEN = "SİZİN_BELİRLEDİĞİNİZ_VERIFY_TOKEN"
-PAGE_ACCESS_TOKEN = "SİZİN_PAGE_ACCESS_TOKENINIZ"
+
+
+def get_old_messages(user_obj, limit=10):
+    
+    with open("alpha_chat.txt", "r", encoding="utf-8") as f:
+        data = f.read()
+    eski_mesajlar = []
+    eski_mesajlar.append(
+        types.Content(
+            role='user',
+            parts=[types.Part.from_text(text=data)]
+        )
+    )
+    old_messages_data = InstagramMessage.objects.filter(user=user_obj).order_by('-timestamp')[:limit]
+ 
+    prev_role = None
+    prev_text = None
+    if old_messages_data:
+        for msg in reversed(old_messages_data):  # kronolojik sıraya çevir
+            role = "user" if msg.is_from_user else "model"
+            if role == prev_role == "user":
+                # Önceki user mesajına ekle
+                prev_text += "\n" + msg.text
+            else:
+                if prev_role is not None:
+                    eski_mesajlar.append(types.Content(
+                        role=prev_role,
+                        parts=[types.Part.from_text(text=prev_text)]
+                    ))
+                prev_role = role
+                prev_text = msg.text
+        # Son mesajı ekle
+        if prev_role is not None:
+            eski_mesajlar.append(types.Content(
+                role=prev_role,
+                parts=[types.Part.from_text(text=prev_text)]
+            ))
+        
+    return eski_mesajlar
+
+def get_gemini_messages(user_obj,new_message ,limit=10):
+    with open("alpha_prompt.txt", "r", encoding="utf-8") as f:
+        prompt = f.read()
+    client = genai.Client(api_key='AIzaSyCAIjIN1mdXHNZgxknmcSMlb_TQIytquCI')
+
+
+    old_messages_data = get_old_messages(user_obj, limit=limit)
+    chat = client.chats.create(
+            model="gemini-2.5-flash",
+            history=old_messages_data,
+            config=types.GenerateContentConfig(
+                system_instruction=prompt, # Sistem promptu buraya eklenir
+                temperature=0.3 # Bilgi tabanına sadık kalması için yaratıcılığı düşürdük
+            )
+        )
+    response = chat.send_message(new_message)  # Son user mesajını gönderiyoruz
+    return response.text
+
 
 @csrf_exempt
 def instagram_webhook(request):
@@ -15,7 +73,7 @@ def instagram_webhook(request):
         token = request.GET.get('hub.verify_token')
         challenge = request.GET.get('hub.challenge')
 
-        if mode == 'subscribe' and token == 'fkalpha_academy':
+        if mode == 'subscribe' and token == :
             return HttpResponse(challenge, content_type="text/plain")
         return HttpResponse("Doğrulama başarısız", status=403)
 
@@ -53,8 +111,7 @@ def instagram_webhook(request):
                                 )
                                 
                                 # OTO YANIT METNİ
-                                reply_text = f"Mesajınız veritabanımıza kaydedildi: '{message_text}'"
-                                
+                                reply_text = get_gemini_messages(user_obj, message_text)    
                                 # API Üzerinden Yanıt Gönder ve Gönderilen Yanıtı da Veritabanına Yaz
                                 send_and_save_reply(user_obj, reply_text)
 
@@ -63,18 +120,21 @@ def instagram_webhook(request):
     return HttpResponse("Yöntem Desteklenmiyor", status=405)
 
 
+
+
 def send_and_save_reply(user_obj, text_content):
     """Kullanıcıya mesaj gönderir ve başarılıysa botun yanıtını da DB'ye kaydeder"""
-    url = "https://facebook.com"
-    headers = {"Content-Type": "application/json"}
+    url = "https://graph.instagram.com/v25.0/me/messages"
+    headers = {'Authorization': 'Bearer IGAATI8zcb86NBZAFlDWmxCMC1kLVFJWWdkSFctS0ZAFYlcyS0xaSzVybGxxMUJIaFUtaUU5cGJpUHNxODRJdzhtVHpOZAjNqQVRjWVNUM3NfSTZAJX1laaHFNakIxT05ZAM19nSEdGM1JvZAk5JNHdicks0MXlGVzBjdERrSjg3R2h6WQZDZD',
+           'Content-Type': 'application/json'
+ }
     payload = {
         "recipient": {"id": user_obj.instagram_id},
         "message": {"text": text_content}
     }
-    params = {"access_token": PAGE_ACCESS_TOKEN}
     
     try:
-        response = requests.post(url, json=payload, params=params, headers=headers)
+        response=requests.post(url,headers=headers,json=payload)
         response_data = response.json()
         
         # Eğer Meta mesajı başarıyla ilettiyse, dönen message_id ile DB'ye kaydet
@@ -86,4 +146,6 @@ def send_and_save_reply(user_obj, text_content):
                 is_from_user=False # Botun yanıtı olduğunu belirtiyoruz
             )
     except requests.exceptions.RequestException as e:
-        print("Mesaj gönderme/kaydetme hatası:", e)
+        with open("api.txt", "a") as f:
+            f.write(f"API İstek Hatası: {e}\n")
+        
