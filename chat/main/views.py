@@ -6,7 +6,8 @@ from django.views.decorators.csrf import csrf_exempt
 from .models import InstagramUser, InstagramMessage
 from google.genai import types
 import os
-from django.conf import settings
+from google.genai.errors import ClientError
+import time
 
 
 
@@ -251,7 +252,16 @@ Kullanıcının adı {name.title()}. Konuşma sırasında kullanıcıya ismiyle 
                 temperature=0.3 # Bilgi tabanına sadık kalması için yaratıcılığı düşürdük
             )
         )
-    response = chat.send_message(new_message)  # Son user mesajını gönderiyoruz
+    for i in range(0,10):
+        while True:
+            try:
+                response = chat.send_message(new_message)  # Son user mesajını gönderiyoruz
+                break
+            except ClientError as e:
+                # 429 durum kodunu kontrol ediyoruz (Resource Exhausted)
+                if e.code == 429:
+                    time.sleep(30)  # 30 saniye bekle
+                    continue
     return response.text
 
 def get_instagram_user_info(instagram_id):
@@ -308,6 +318,7 @@ def instagram_webhook(request):
                                 return HttpResponse("EVENT_RECEIVED", status=200) # Takip eden kullanıcılar için yanıt vermiyoruz
                             
                             reply_text = get_gemini_messages(user_obj, message_text)  
+                            
                             # GELEN MESAJI KAYDET (Aynı message_id daha önce işlenmediyse)
                             if not InstagramMessage.objects.filter(message_id=message_id).exists():
                                 InstagramMessage.objects.create(
