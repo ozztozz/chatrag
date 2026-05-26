@@ -3,6 +3,9 @@ from django.db import models
 class InstagramUser(models.Model):
     # Meta'nın verdiği benzersiz kullanıcı ID'si (IGSID)
     instagram_id = models.CharField(max_length=100, unique=True, primary_key=True)
+    is_user_follow_business = models.BooleanField(default=False)  # Kullanıcının işletmeyi takip edip etmediği bilgisi
+    name = models.CharField(max_length=255, blank=True, null=True)  # Kullanıcının adı (varsa)
+    username = models.CharField(max_length=255, blank=True, null=True)  # Kullanıcının IG kullanıcı adı (varsa)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

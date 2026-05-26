@@ -236,12 +236,12 @@ sporcu ve veli adını kaydet
 telefonu kaydet
 
 """
-    client = genai.Client(api_key='AIzaSyCAIjIN1mdXHNZgxknmcSMlb_TQIytquCI')
+    client = genai.Client(api_key='AIzaSyA2I9jijJMOPyIMSzsbwD8gputfk94O8kA')
 
 
     old_messages_data = get_old_messages(user_obj, limit=limit)
     chat = client.chats.create(
-            model="gemini-2.5-flash",
+            model="gemini-2.5-flash-lite",
             history=old_messages_data,
             config=types.GenerateContentConfig(
                 system_instruction=prompt, # Sistem promptu buraya eklenir
@@ -251,6 +251,11 @@ telefonu kaydet
     response = chat.send_message(new_message)  # Son user mesajını gönderiyoruz
     return response.text
 
+def get_instagram_user_info(instagram_id):
+    url = f"https://graph.instagram.com/v25.0/{instagram_id}?fields=name,username,is_user_follow_business&access_token=IGAATI8zcb86NBZAFlDWmxCMC1kLVFJWWdkSFctS0ZAFYlcyS0xaSzVybGxxMUJIaFUtaUU5cGJpUHNxODRJdzhtVHpOZAjNqQVRjWVNUM3NfSTZAJX1laaHFNakIxT05ZAM19nSEdGM1JvZAk5JNHdicks0MXlGVzBjdERrSjg3R2h6WQZDZD"
+    response=requests.get(url)
+    metadata=response.json()
+    return metadata
 
 @csrf_exempt
 def instagram_webhook(request):
@@ -287,7 +292,17 @@ def instagram_webhook(request):
                             
                             # KULLANICIYI KAYDET (Yoksa oluşturur, varsa mevcut olanı getirir)
                             user_obj, created = InstagramUser.objects.get_or_create(instagram_id=sender_id)
-                            
+                            if created:
+                                try:
+                                    user_info = get_instagram_user_info(sender_id)
+                                    user_obj.name = user_info.get('name')
+                                    user_obj.username = user_info.get('username')
+                                    user_obj.is_user_follow_business = user_info.get('is_user_follow_business', False)
+                                    user_obj.save()
+                                except Exception as e:
+                                   pass
+        
+                            reply_text = get_gemini_messages(user_obj, message_text)  
                             # GELEN MESAJI KAYDET (Aynı message_id daha önce işlenmediyse)
                             if not InstagramMessage.objects.filter(message_id=message_id).exists():
                                 InstagramMessage.objects.create(
@@ -298,7 +313,7 @@ def instagram_webhook(request):
                                 )
                                 
                                 # OTO YANIT METNİ
-                                reply_text = get_gemini_messages(user_obj, message_text)    
+                                 
                                 # API Üzerinden Yanıt Gönder ve Gönderilen Yanıtı da Veritabanına Yaz
                                 send_and_save_reply(user_obj, reply_text)
 
