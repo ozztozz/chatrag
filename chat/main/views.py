@@ -73,18 +73,10 @@ def get_gemini_messages(user_obj,new_message ,limit=10):
                 temperature=0.3 # Bilgi tabanına sadık kalması için yaratıcılığı düşürdük
             )
         )
-    for i in range(0,2):
-        
-        try:
-            response = chat.send_message(new_message)  # Son user mesajını gönderiyoruz
+
+    response = chat.send_message(new_message)  # Son user mesajını gönderiyoruz
             
-        except ClientError as e:
-                # 429 durum kodunu kontrol ediyoruz (Resource Exhausted)
-            if e.code == 429:
-                time.sleep(i * 20)  # 30 saniye bekle
-                continue
-        else:
-            break
+
     return response.text
 
 def get_instagram_user_info(instagram_id):
@@ -101,7 +93,7 @@ def instagram_webhook(request):
         token = request.GET.get('hub.verify_token')
         challenge = request.GET.get('hub.challenge')
 
-        if mode == 'subscribe' and token == 'alphaacademyverifytoken' :
+        if mode == 'subscribe' and token == ' fkalpha_academy_token' :
             return HttpResponse(challenge, content_type="text/plain")
         return HttpResponse("Doğrulama başarısız", status=403)
 
@@ -166,7 +158,7 @@ def instagram_webhook(request):
 def send_and_save_reply(user_obj, text_content):
     """Kullanıcıya mesaj gönderir ve başarılıysa botun yanıtını da DB'ye kaydeder"""
     url = "https://graph.instagram.com/v25.0/me/messages"
-    headers = {f'Authorization': f'Bearer {INSTAGRAM_ACCESS_TOKEN}',
+    headers = {'Authorization': 'Bearer IGAATI8zcb86NBZAFlDWmxCMC1kLVFJWWdkSFctS0ZAFYlcyS0xaSzVybGxxMUJIaFUtaUU5cGJpUHNxODRJdzhtVHpOZAjNqQVRjWVNUM3NfSTZAJX1laaHFNakIxT05ZAM19nSEdGM1JvZAk5JNHdicks0MXlGVzBjdERrSjg3R2h6WQZDZD',
            'Content-Type': 'application/json'
  }
     payload = {
@@ -187,6 +179,6 @@ def send_and_save_reply(user_obj, text_content):
                 is_from_user=False # Botun yanıtı olduğunu belirtiyoruz
             )
     except requests.exceptions.RequestException as e:
-        with open("api.txt", "a") as f:
-            f.write(f"API İstek Hatası: {e}\n")
+        # Hata durumunda loglama yapabiliriz
+        print(f"Mesaj gönderilirken hata oluştu: {e}")
         

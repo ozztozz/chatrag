@@ -120,5 +120,12 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# 2. Additional global directories where Django looks for static assets
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
+
+# 3. The absolute directory where files gather for production deployment
+STATIC_ROOT = BASE_DIR / 'static'
 INSTAGRAM_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
