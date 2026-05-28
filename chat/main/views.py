@@ -11,7 +11,7 @@ from django.conf import settings
 from google.genai.errors import ClientError
 import random
 INSTAGRAM_ACCESS_TOKEN = settings.INSTAGRAM_ACCESS_TOKEN
-GEMINI_API_KEYS = settings.GEMINI_API_KEY
+GEMINI_API_KEY = settings.GEMINI_API_KEY
 with staticfiles_storage.open('knowledge.txt') as f:
         KNOWLEDGE = f.read().decode('utf-8')
 with staticfiles_storage.open('promt.txt') as f:
@@ -62,7 +62,7 @@ def get_gemini_messages(user_obj,new_message ,limit=20):
     old_messages_data = get_old_messages(user_obj, limit=limit)
 
     
-    GEMINI_API_KEY = random.choice(GEMINI_API_KEYS)
+    
     client = genai.Client(api_key=GEMINI_API_KEY)
     chat = client.chats.create(
             model="gemini-2.5-flash-lite",
@@ -72,8 +72,10 @@ def get_gemini_messages(user_obj,new_message ,limit=20):
                 temperature=0.3 # Bilgi tabanına sadık kalması için yaratıcılığı düşürdük
             )
         )
-    response = chat.send_message(new_message)  # Son user mesajını gönderiyoruz
-            
+    try:
+        response = chat.send_message(new_message)  # Son user mesajını gönderiyoruz
+    except ClientError as e:
+        return f"Error:{e.code} - {e.message}"
 
     return response.text
 
@@ -83,6 +85,17 @@ def get_instagram_user_info(instagram_id):
     metadata=response.json()
     return metadata
 
+def send_writing_indicator(sender_id):
+    """Instagram'a yazıyor göstergesi gönderir"""
+    url = "https://graph.instagram.com/v25.0/me/messages"
+    headers = {'Authorization': 'Bearer IGAATI8zcb86NBZAFlDWmxCMC1kLVFJWWdkSFctS0ZAFYlcyS0xaSzVybGxxMUJIaFUtaUU5cGJpUHNxODRJdzhtVHpOZAjNqQVRjWVNUM3NfSTZAJX1laaHFNakIxT05ZAM19nSEdGM1JvZAk5JNHdicks0MXlGVzBjdERrSjg3R2h6WQZDZD',
+           'Content-Type': 'application/json'
+ }
+    payload = {
+        "recipient": {"id": sender_id},
+        "sender_action": "typing_on"
+    }
+    response=requests.post(url,headers=headers,json=payload)
 @csrf_exempt
 def instagram_webhook(request):
     # 1. DOĞRULAMA ADIMI (GET)
@@ -139,7 +152,7 @@ def instagram_webhook(request):
                                     text=message_text,
                                     is_from_user=True
                                 )
-                                
+                                send_writing_indicator(sender_id)
                                 # OTO YANIT METNİ
                                 reply_text = get_gemini_messages(user_obj, message_text)  
                                 # API Üzerinden Yanıt Gönder ve Gönderilen Yanıtı da Veritabanına Yaz
