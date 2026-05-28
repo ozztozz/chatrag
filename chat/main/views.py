@@ -9,9 +9,9 @@ from google.genai import types
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.conf import settings
 from google.genai.errors import ClientError
-import time
+import random
 INSTAGRAM_ACCESS_TOKEN = settings.INSTAGRAM_ACCESS_TOKEN
-GEMINI_API_KEY = settings.GEMINI_API_KEY
+GEMINI_API_KEYS = settings.GEMINI_API_KEY
 with staticfiles_storage.open('knowledge.txt') as f:
         KNOWLEDGE = f.read().decode('utf-8')
 with staticfiles_storage.open('promt.txt') as f:
@@ -55,16 +55,15 @@ def get_old_messages(user_obj, limit=10):
         
     return eski_mesajlar
 
-def get_gemini_messages(user_obj,new_message ,limit=10):
+def get_gemini_messages(user_obj,new_message ,limit=20):
     name= user_obj.name if user_obj.name else "Değerli Velimiz"
-    name_part = f"Kullanıcının adı {name.title()}. Konuşma sırasında kullanıcıya ismiyle hitap et ve samimi/profesyonel bir dil kullan."
-
+    name_part = f"Kullanıcının adı {name.title()}. Konuşmaya başlarken kullanıcıya ismiyle hitap et ve samimi/profesyonel bir dil kullan."
     prompt = PROMT+name_part
-    
-    client = genai.Client(api_key=GEMINI_API_KEY)
-
-
     old_messages_data = get_old_messages(user_obj, limit=limit)
+
+    
+    GEMINI_API_KEY = random.choice(GEMINI_API_KEYS)
+    client = genai.Client(api_key=GEMINI_API_KEY)
     chat = client.chats.create(
             model="gemini-2.5-flash-lite",
             history=old_messages_data,
@@ -73,14 +72,13 @@ def get_gemini_messages(user_obj,new_message ,limit=10):
                 temperature=0.3 # Bilgi tabanına sadık kalması için yaratıcılığı düşürdük
             )
         )
-
     response = chat.send_message(new_message)  # Son user mesajını gönderiyoruz
             
 
     return response.text
 
 def get_instagram_user_info(instagram_id):
-    url = f"https://graph.instagram.com/v25.0/{instagram_id}?fields=name,username,is_user_follow_business&access_token={INSTAGRAM_ACCESS_TOKEN}"
+    url = f"https://graph.instagram.com/v25.0/{instagram_id}?fields=name,username,is_user_follow_business&access_token=IGAATI8zcb86NBZAFlDWmxCMC1kLVFJWWdkSFctS0ZAFYlcyS0xaSzVybGxxMUJIaFUtaUU5cGJpUHNxODRJdzhtVHpOZAjNqQVRjWVNUM3NfSTZAJX1laaHFNakIxT05ZAM19nSEdGM1JvZAk5JNHdicks0MXlGVzBjdERrSjg3R2h6WQZDZD"
     response=requests.get(url)
     metadata=response.json()
     return metadata
@@ -132,8 +130,7 @@ def instagram_webhook(request):
                             if user_obj.is_user_follow_business:
                                 return HttpResponse("EVENT_RECEIVED", status=200) # Takip eden kullanıcılar için yanıt vermiyoruz
                             
-                            reply_text = get_gemini_messages(user_obj, message_text)  
-                            
+
                             # GELEN MESAJI KAYDET (Aynı message_id daha önce işlenmediyse)
                             if not InstagramMessage.objects.filter(message_id=message_id).exists():
                                 InstagramMessage.objects.create(
@@ -144,15 +141,13 @@ def instagram_webhook(request):
                                 )
                                 
                                 # OTO YANIT METNİ
-                                 
+                                reply_text = get_gemini_messages(user_obj, message_text)  
                                 # API Üzerinden Yanıt Gönder ve Gönderilen Yanıtı da Veritabanına Yaz
                                 send_and_save_reply(user_obj, reply_text)
 
         return HttpResponse("EVENT_RECEIVED", status=200)
 
     return HttpResponse("Yöntem Desteklenmiyor", status=405)
-
-
 
 
 def send_and_save_reply(user_obj, text_content):
