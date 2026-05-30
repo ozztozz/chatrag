@@ -127,6 +127,6 @@ STATICFILES_DIRS = [
 
 # 3. The absolute directory where files gather for production deployment
 STATIC_ROOT = BASE_DIR / 'static'
-INSTAGRAM_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
-ALPHA_INSTAGRAM_ACCESS_TOKEN = os.getenv("ALPHA_INSTAGRAM_ACCESS_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+INSTAGRAM_ACCESS_TOKEN = os.getenv('INSTAGRAM_ACCESS_TOKEN', '').strip()
+ALPHA_INSTAGRAM_ACCESS_TOKEN = os.getenv("ALPHA_INSTAGRAM_ACCESS_TOKEN", '').strip()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", '').strip()
