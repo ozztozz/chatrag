@@ -13,7 +13,8 @@ from django.conf import settings
 
 
 GEMINI_API_KEY = settings.GEMINI_API_KEY
-INSTAGRAM_ACCESS_TOKEN = settings.INSTAGRAM_ACCESS_TOKEN.strip()
+
+
 with staticfiles_storage.open('knowledge.txt') as f:
         KNOWLEDGE = f.read().decode('utf-8')
 with staticfiles_storage.open('promt.txt') as f:
@@ -115,7 +116,7 @@ def get_gemini_messages(user_obj, new_message, limit=30):
     return "Üzgünüm, şu anda yanıt veremiyorum."
 
 def get_instagram_user_info(instagram_id):
-    url = f"https://graph.instagram.com/v25.0/{instagram_id}?fields=name,username,is_user_follow_business&access_token={INSTAGRAM_ACCESS_TOKEN}"
+    url = f"https://graph.instagram.com/v25.0/{instagram_id}?fields=name,username,is_user_follow_business&access_token=IGAATI8zcb86NBZAFlDWmxCMC1kLVFJWWdkSFctS0ZAFYlcyS0xaSzVybGxxMUJIaFUtaUU5cGJpUHNxODRJdzhtVHpOZAjNqQVRjWVNUM3NfSTZAJX1laaHFNakIxT05ZAM19nSEdGM1JvZAk5JNHdicks0MXlGVzBjdERrSjg3R2h6WQZDZD"
     response=requests.get(url)
     metadata=response.json()
     return metadata
@@ -123,9 +124,10 @@ def get_instagram_user_info(instagram_id):
 def send_writing_indicator(sender_id):
     """Instagram'a yazıyor göstergesi gönderir"""
     url = "https://graph.instagram.com/v25.0/me/messages"
-    headers = {'Authorization': f'Bearer {INSTAGRAM_ACCESS_TOKEN}',
-           'Content-Type': 'application/json'
- }
+    headers = {
+        'Authorization': 'Bearer IGAATI8zcb86NBZAGE5R3IzNWpPc3pWbnE4aFBLSzM5NE5XdDhtWDRpSnNHRDYzUmJ0YUtRYjRIRzNnc1BXTnRMRlpSOGMxalJGck9LUktCV1ZAPcVFNWjhlY3dxS3VRWGlTejZASaEZA1aktCM1BCMldxUjQ2NlZAjVTRxM3puRUNZASQZDZD',
+        'Content-Type': 'application/json'
+    }
     payload = {
         "recipient": {"id": sender_id},
         "sender_action": "typing_on"

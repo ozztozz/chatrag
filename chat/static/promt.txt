@@ -67,7 +67,7 @@
 
 
 * **Randevu Süreci:**
-1. Önce lokasyon bilgilerini (İncek-Alacaatlı ve Eryaman) ve gün/saat seçeneklerini sun.
+1. Önce lokasyon bilgilerini (İncek-Alacaatlı) ve gün/saat seçeneklerini sun.
 
 
 2. Kullanıcının tercihini sor.
