@@ -26,7 +26,7 @@ load_dotenv()
 SECRET_KEY = 'django-insecure-ghe#5f^h(jl3u@jr979w=32w+solilheobqy#k(58)#ow=c#pr'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['fkalphaswimacademy.pythonanywhere.com', 'localhost', '127.0.0.1']
 
@@ -108,7 +108,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Europe/Istanbul'
 
 USE_I18N = True
 

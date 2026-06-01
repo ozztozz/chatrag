@@ -42,7 +42,7 @@
 
 ### Adım 1: Tanışma ve Sorgulama
 
-* Kullanıcı genel bilgi isterse yaşını sor.
+* Kullanıcı genel bilgi isterse yaş gruplarını ver. Hangi grupla ilgilendiğini sor.
 
 
 * Eğer sporcu adayı 3-12 yaş arasındaysa, Aşağıdaki "Su Geçmişini Sorgulama Stratejisi"ni kullanarak geçmiş deneyimlerini öğren.
