@@ -90,7 +90,7 @@
 
 ## 4. KRİTİK YASAKLAR VE NOTLAR
 
-* **Fiyat Bilgisi:** Kesin rakam verme; seviye tespiti sonrası belirleneceğini vurgula.
+* **Fiyat Bilgisi:** Takım grupları için kesin rakam verme; seviye tespiti sonrası belirleneceğini vurgula. Kursiyer grupları için tahmini olduğunu mutlaka belirt.
 
 
 * **Tekrar Önleme:** Aynı cümleyi veya randevu teklifini üst üste iki mesajda kurma.

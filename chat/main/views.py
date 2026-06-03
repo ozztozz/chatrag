@@ -13,6 +13,7 @@ from django.conf import settings
 
 
 GEMINI_API_KEY = settings.GEMINI_API_KEY
+INSTAGRAM_ACCESS_TOKEN = settings.INSTAGRAM_ACCESS_TOKEN.strip()
 
 
 with staticfiles_storage.open('knowledge.txt') as f:
@@ -23,7 +24,7 @@ with staticfiles_storage.open('promt.txt') as f:
 def get_old_messages(user_obj, limit=30):
     eski_mesajlar = []
     old_messages_data = InstagramMessage.objects.filter(user=user_obj).order_by('-timestamp')[:limit]
- 
+
     prev_role = None
     prev_text = None
     if old_messages_data:
@@ -46,7 +47,7 @@ def get_old_messages(user_obj, limit=30):
                 role=prev_role,
                 parts=[types.Part.from_text(text=prev_text)]
             ))
-        
+
     return eski_mesajlar
 
 def get_gemini_messages(user_obj, new_message, limit=30):
@@ -60,11 +61,11 @@ def get_gemini_messages(user_obj, new_message, limit=30):
 
     # 3. Hepsini ana PROMT değişkeninizle birleştiriyoruz
     final_system_instruction = PROMT + name_part + knowledge_part
-        
+
     old_messages_data = get_old_messages(user_obj, limit=limit)
-    
+
     client = genai.Client(api_key=GEMINI_API_KEY)
-    
+
     chat = client.chats.create(
         model="gemini-2.5-flash-lite",
         history=old_messages_data,
@@ -78,7 +79,7 @@ def get_gemini_messages(user_obj, new_message, limit=30):
     for i in range(3):  # 3 deneme hakkı
         try:
             response = chat.send_message(new_message)
-            
+
             # Başarılı bir response aldık mı ve içinde text var mı? (Güvenlik filtresi kontrolü)
             if response and getattr(response, 'text', None):
                 return response.text
@@ -86,7 +87,7 @@ def get_gemini_messages(user_obj, new_message, limit=30):
                 # Response döndü ama text yoksa (örn: Safety Block / Güvenlik engeli)
                 print(f"Deneme {i+1}: Boş veya filtrelenmiş yanıt alındı.")
                 chat.rewind()  # Boş turn'ü geçmişten silerek chat'i temiz tutuyoruz.
-                
+
         except errors.APIError as e:
             # API tabanlı hatalar (Kota aşımı, 500 server hatası vb.)
             print(f"Deneme {i+1} - Gemini API Hatası ({e.code}): {e.message}")
@@ -94,10 +95,10 @@ def get_gemini_messages(user_obj, new_message, limit=30):
                 chat.rewind()  # Hata alan mesajı geçmişten geri al
             except Exception:
                 pass
-                
+
             if i == 2:  # Son denemede de başarısız olduysa
                 return f"Error: {e.code} - {e.message}"
-                
+
         except Exception as e:
             # Diğer beklenmedik sistem/bağlantı hataları
             print(f"Deneme {i+1} - Beklenmeyen hata: {e}")
@@ -105,10 +106,10 @@ def get_gemini_messages(user_obj, new_message, limit=30):
                 chat.rewind()
             except Exception:
                 pass
-                
+
             if i == 2:
                 return "Üzgünüm, şu anda yanıt veremiyorum. (Sistem hatası)"
-        
+
         # Yeniden denemeden önce bekle (Exponential backoff mantığı: her adımda daha çok bekle)
         time.sleep((i + 1) * 3)
 
@@ -116,7 +117,7 @@ def get_gemini_messages(user_obj, new_message, limit=30):
     return "Üzgünüm, şu anda yanıt veremiyorum."
 
 def get_instagram_user_info(instagram_id):
-    url = f"https://graph.instagram.com/v25.0/{instagram_id}?fields=name,username,is_user_follow_business&access_token=IGAATI8zcb86NBZAFlDWmxCMC1kLVFJWWdkSFctS0ZAFYlcyS0xaSzVybGxxMUJIaFUtaUU5cGJpUHNxODRJdzhtVHpOZAjNqQVRjWVNUM3NfSTZAJX1laaHFNakIxT05ZAM19nSEdGM1JvZAk5JNHdicks0MXlGVzBjdERrSjg3R2h6WQZDZD"
+    url = f"https://graph.instagram.com/v25.0/{instagram_id}?fields=name,username,is_user_follow_business&access_token=IGAATI8zcb86NBZAGFZAYVhSNExKb19IeE1tMmhBMU9uRU5WWWIzOUctVVRJWVByLTdLMEFHRGFBMjYyZA1l3Y0hKa3cxTkZAKWTB6V1laWkQ5UDZAmUUNKdHcwc29yb3pvZAVpxSmk1eWFKaG50WGhFZA1VIMGhkN1B5cThWcFdHTDU3WQZDZD"
     response=requests.get(url)
     metadata=response.json()
     return metadata
@@ -155,18 +156,18 @@ def instagram_webhook(request):
         if data.get('object') == 'instagram':
             for entry in data.get('entry', []):
                 for messaging_event in entry.get('messaging', []):
-                    
+
                     sender_id = messaging_event.get('sender', {}).get('id')
-                    
+
                     if 'message' in messaging_event:
                         message_data = messaging_event['message']
                         message_id = message_data.get('mid') # Meta'nın verdiği benzersiz mesaj ID'si
                         message_text = message_data.get('text')
                         recipient_id = messaging_event['recipient']['id']
-                        
+
                         # 1. Kural: Mesaj metni var mı ve botun kendi mesajı (echo) değil mi?
                         if message_text and not message_data.get('is_echo'):
-                            
+
                             # KULLANICIYI KAYDET (Yoksa oluşturur, varsa mevcut olanı getirir)
                             user_obj, created = InstagramUser.objects.get_or_create(instagram_id=sender_id)
                             try:
@@ -179,14 +180,14 @@ def instagram_webhook(request):
                                 pass
                             if user_obj.is_user_follow_business:
                                 return HttpResponse("EVENT_RECEIVED", status=200) # Takip eden kullanıcılar için yanıt vermiyoruz
-                            
+
 
                             # GELEN MESAJI KAYDET (Aynı message_id daha önce işlenmediyse)
                             if not InstagramMessage.objects.filter(message_id=message_id).exists():
                                 send_writing_indicator(sender_id)
                                 # OTO YANIT METNİ
                                 reply_text = get_gemini_messages(user_obj, message_text)
-                                #reply_text = "Bu bir otomatik yanıttır. Mesajınız bize ulaştı ve en kısa sürede cevaplanacaktır."  
+                                #reply_text = "Bu bir otomatik yanıttır. Mesajınız bize ulaştı ve en kısa sürede cevaplanacaktır."
                                 InstagramMessage.objects.create(
                                     user=user_obj,
                                     message_id=message_id,
@@ -212,15 +213,15 @@ def send_and_save_reply(user_obj, gemini_response):
         'Authorization': 'Bearer IGAATI8zcb86NBZAGE5R3IzNWpPc3pWbnE4aFBLSzM5NE5XdDhtWDRpSnNHRDYzUmJ0YUtRYjRIRzNnc1BXTnRMRlpSOGMxalJGck9LUktCV1ZAPcVFNWjhlY3dxS3VRWGlTejZASaEZA1aktCM1BCMldxUjQ2NlZAjVTRxM3puRUNZASQZDZD',
         'Content-Type': 'application/json'
     }
-    
+
     payload = {
         "recipient": {"id": user_obj.instagram_id}
     }
-    
+
     # Adım 1: Yanıtın içindeki ilk '{' ve son '}' karakterlerini bulup sadece JSON kısmını izole edelim
     # Bu sayede başında/sonunda yazı veya görünmez karakterler olsa bile kod patlamaz.
     json_match = re.search(r'\{.*\}', gemini_response, re.DOTALL)
-    
+
     is_json = False
     db_text = gemini_response
 
@@ -229,7 +230,7 @@ def send_and_save_reply(user_obj, gemini_response):
             # Sadece eşleşen JSON string'ini alıyoruz
             pure_json_str = json_match.group(0)
             parsed_data = json.loads(pure_json_str)
-            
+
             # Adım 2: Meta API'nin tam olarak beklediği 'message' yapısını hiyerarşik olarak bulalım
             # Eğer en dışta "message" anahtarı varsa onu soyuyoruz
             if "message" in parsed_data:
@@ -266,7 +267,7 @@ def send_and_save_reply(user_obj, gemini_response):
     try:
         response = requests.post(url, headers=headers, json=payload)
         response_data = response.json()
-        
+
         if "message_id" in response_data:
             InstagramMessage.objects.create(
                 user=user_obj,
@@ -279,7 +280,7 @@ def send_and_save_reply(user_obj, gemini_response):
             # Meta'dan dönen hatayı loglayın (Buton kısıtlamalarına takılıp takılmadığını görmek için)
             print(f"Meta API Reddedildi: {response_data}")
             return False
-            
+
     except requests.exceptions.RequestException as e:
         print(f"Meta API Bağlantı Hatası: {e}")
         return False
