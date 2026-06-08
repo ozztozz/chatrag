@@ -6,7 +6,7 @@ from .models import UserAccount
 
 # In production, move these safely to environment variables or settings.py
 INSTAGRAM_APP_ID = '1568510561659920'
-INSTAGRAM_APP_SECRET = 'ozztozzSecretKey'  # Replace with your actual Instagram App Secret
+INSTAGRAM_APP_SECRET = 'a6dbe5aac79a5129367a6906a7f451f2'  # Replace with your actual Instagram App Secret
 REDIRECT_URI = 'https://rinsing-postwar-excuse.ngrok-free.dev/auth/oauth/callback/' # Must exactly match Meta Dashboard
 
 def login_page(request):
