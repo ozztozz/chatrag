@@ -26,9 +26,12 @@ load_dotenv()
 SECRET_KEY = 'django-insecure-ghe#5f^h(jl3u@jr979w=32w+solilheobqy#k(58)#ow=c#pr'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
-ALLOWED_HOSTS = ['fkalphaswimacademy.pythonanywhere.com', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['fkalphaswimacademy.pythonanywhere.com',
+                  'localhost',
+                    '127.0.0.1',
+                    'rinsing-postwar-excuse.ngrok-free.dev']
 
 
 # Application definition
@@ -41,7 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'main',
-]
+    'authInstagram',]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -115,19 +118,19 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-STATIC_URL = 'static/'
+# Where Django looks for your project's custom static files (development)
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
 
+# Where Django copies all static files when you run collectstatic (production)
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-if DEBUG:
-    STATICFILES_DIRS = [
-            os.path.join(BASE_DIR, 'static')
-       ]
-else:
-        STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-
+STATIC_URL = '/static/'
 
 INSTAGRAM_ACCESS_TOKEN = os.getenv('INSTAGRAM_ACCESS_TOKEN', '').strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", '').strip()
+
+CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.dev']

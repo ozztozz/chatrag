@@ -20,4 +20,5 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('main.urls')),  # main uygulamasının urls.py'sini dahil ediyoruz
+    path('auth/', include('authInstagram.urls')),  # authInstagram uygulamasının urls.py'sini dahil ediyoruz
 ]

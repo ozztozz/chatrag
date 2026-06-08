@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login to My App</title>
+    <style>
+        .login-container { text-align: center; margin-top: 100px; font-family: Arial, sans-serif; }
+        .instagram-btn {
+            background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+            color: white; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>Welcome to Our App</h2>
+        <p>Please connect your Instagram account to get started.</p>
+        <a href="{% url 'instagram_login' %}" class="instagram-btn">Connect with Instagram</a>
+    </div>
+
+
+
+    
+</body>
+</html>
