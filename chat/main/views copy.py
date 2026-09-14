@@ -89,21 +89,29 @@ def get_gemini_messages(user_obj,new_message ,limit=30):
 
 def get_instagram_user_info(instagram_id):
     url = f"https://graph.instagram.com/v25.0/{instagram_id}?fields=name,username,is_user_follow_business&access_token=IGAATI8zcb86NBZAGE5R3IzNWpPc3pWbnE4aFBLSzM5NE5XdDhtWDRpSnNHRDYzUmJ0YUtRYjRIRzNnc1BXTnRMRlpSOGMxalJGck9LUktCV1ZAPcVFNWjhlY3dxS3VRWGlTejZASaEZA1aktCM1BCMldxUjQ2NlZAjVTRxM3puRUNZASQZDZD"
-    response=requests.get(url)
+        url = f"https://graph.instagram.com/v25.0/{instagram_id}"
+        response = requests.get(
+            url,
+            params={
+                "fields": "name,username,is_user_follow_business",
+                "access_token": settings.INSTAGRAM_ACCESS_TOKEN,
+            },
+            timeout=10,
+        )
     metadata=response.json()
     return metadata
 
 def send_writing_indicator(sender_id):
     """Instagram'a yazıyor göstergesi gönderir"""
     url = "https://graph.instagram.com/v25.0/me/messages"
-    headers = {'Authorization': 'Bearer IGAATI8zcb86NBZAGE5R3IzNWpPc3pWbnE4aFBLSzM5NE5XdDhtWDRpSnNHRDYzUmJ0YUtRYjRIRzNnc1BXTnRMRlpSOGMxalJGck9LUktCV1ZAPcVFNWjhlY3dxS3VRWGlTejZASaEZA1aktCM1BCMldxUjQ2NlZAjVTRxM3puRUNZASQZDZD',
+        headers = {'Authorization': f'Bearer {settings.INSTAGRAM_ACCESS_TOKEN}',
            'Content-Type': 'application/json'
  }
     payload = {
         "recipient": {"id": sender_id},
         "sender_action": "typing_on"
     }
-    response=requests.post(url,headers=headers,json=payload)
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
 @csrf_exempt
 def instagram_webhook(request):
     # 1. DOĞRULAMA ADIMI (GET)
@@ -122,7 +130,7 @@ def instagram_webhook(request):
             data = json.loads(request.body.decode('utf-8'))
         except json.JSONDecodeError:
             return HttpResponse("Geçersiz JSON", status=400)
-
+            if mode == 'subscribe' and token == settings.INSTAGRAM_WEBHOOK_VERIFY_TOKEN:
         if data.get('object') == 'instagram':
             for entry in data.get('entry', []):
                 for messaging_event in entry.get('messaging', []):

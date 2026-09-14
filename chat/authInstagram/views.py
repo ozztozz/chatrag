@@ -1,13 +1,17 @@
+import logging
+import secrets
+from urllib.parse import urlencode
+
 import requests
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.conf import settings
 from .models import UserAccount
 
-# In production, move these safely to environment variables or settings.py
-INSTAGRAM_APP_ID = '1568510561659920'
-INSTAGRAM_APP_SECRET = 'a6dbe5aac79a5129367a6906a7f451f2'  # Replace with your actual Instagram App Secret
-REDIRECT_URI = 'https://rinsing-postwar-excuse.ngrok-free.dev/auth/oauth/callback/' # Must exactly match Meta Dashboard
+INSTAGRAM_APP_ID = settings.INSTAGRAM_APP_ID
+INSTAGRAM_APP_SECRET = settings.INSTAGRAM_APP_SECRET
+REDIRECT_URI = settings.INSTAGRAM_REDIRECT_URI
+logger = logging.getLogger(__name__)
 
 def login_page(request):
     """Renders the standard login template UI."""
@@ -18,22 +22,28 @@ def instagram_login(request):
     # Define what permissions your app is requesting (comma-separated)
     # For basic Consumer API: 'instagram_graph_user_profile,instagram_graph_user_media'
     # For Business Graph API: 'instagram_basic,instagram_manage_insights,pages_read_engagement'
-    scopes = 'instagram_graph_user_profile,instagram_graph_user_media'
-    
-    instagram_auth_url = (
-        f"https://api.instagram.com/oauth/authorize"
-        f"?force_reauth=true"
-        f"&client_id={INSTAGRAM_APP_ID}"
-        f"&redirect_uri={REDIRECT_URI}"
-        f"&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights"
-        f"&response_type=code"
-    )
+    scopes = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish,instagram_business_manage_insights'
+    state = secrets.token_urlsafe(32)
+    request.session['instagram_oauth_state'] = state
+
+    instagram_auth_url = 'https://api.instagram.com/oauth/authorize?' + urlencode({
+        'force_reauth': 'true',
+        'client_id': INSTAGRAM_APP_ID,
+        'redirect_uri': REDIRECT_URI,
+        'scope': scopes,
+        'response_type': 'code',
+        'state': state,
+    })
     return redirect(instagram_auth_url)
 
 def instagram_callback(request):
     """Instagram'ın kullanıcıyı geri gönderdiği ve kodu onaylattığımız yer."""
     code = request.GET.get('code')
-    print("Instagram'dan gelen kod:", code)  # Debug için ekledik
+    state = request.GET.get('state')
+    expected_state = request.session.pop('instagram_oauth_state', None)
+
+    if not expected_state or not state or not secrets.compare_digest(state, expected_state):
+        return JsonResponse({"error": "Geçersiz OAuth state değeri."}, status=400)
     
     if not code:
         return JsonResponse({"error": "Code parametresi bulunamadı."}, status=400)
@@ -51,9 +61,12 @@ def instagram_callback(request):
     }
     
     # Instagram'a doğrulama kodunu gönderip Access Token istiyoruz
-    response = requests.post(token_url, data=payload)
-    print("META DETAYLI CEVAP:", response.text)
-    token_data = response.json()
+    response = requests.post(token_url, data=payload, timeout=10)
+    try:
+        token_data = response.json()
+    except ValueError:
+        logger.error("Instagram token endpoint returned a non-JSON response", exc_info=True)
+        return JsonResponse({"error": "Instagram doğrulaması başarısız."}, status=502)
     
     if 'access_token' in token_data:
         # Başarılı! Token'ı aldınız.
@@ -62,12 +75,10 @@ def instagram_callback(request):
         user_obj, created = UserAccount.objects.get_or_create(instagram_user_id=user_id)
         user_obj.access_token = access_token
         user_obj.save()
-        return JsonResponse({"status": "Başarılı!", "data": token_data})
+        return JsonResponse({"status": "Başarılı!"})
     else:
         # Hata buraya düşüyor
-        return JsonResponse({
-            "error": "Token alınamadı", 
-            "meta_response": token_data  # Meta'dan gelen tam hata mesajını görmek için
-        }, status=400)
+        logger.warning("Instagram token exchange failed with status %s", response.status_code)
+        return JsonResponse({"error": "Instagram doğrulaması başarısız."}, status=400)
     
    

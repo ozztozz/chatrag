@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,19 +21,23 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-import os
 from dotenv import load_dotenv
-load_dotenv()
-SECRET_KEY = 'django-insecure-ghe#5f^h(jl3u@jr979w=32w+solilheobqy#k(58)#ow=c#pr'
+load_dotenv(BASE_DIR / '.env')
+SECRET_KEY = os.getenv('SECRET_KEY', '').strip()
+if not SECRET_KEY:
+    raise ImproperlyConfigured('SECRET_KEY must be set in the environment')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'False').strip().lower() in {'1', 'true', 'yes'}
 
-ALLOWED_HOSTS = ['fkalphaswimacademy.pythonanywhere.com',
-                  'localhost',
-                    '127.0.0.1',
-                    'rinsing-postwar-excuse.ngrok-free.dev']
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv(
+        'ALLOWED_HOSTS',
+        'fkalphaswimacademy.pythonanywhere.com,localhost,127.0.0.1',
+    ).split(',')
+    if host.strip()
+]
 
 
 # Application definition
@@ -132,5 +138,39 @@ STATIC_URL = '/static/'
 
 INSTAGRAM_ACCESS_TOKEN = os.getenv('INSTAGRAM_ACCESS_TOKEN', '').strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", '').strip()
+GEMINI_MODELS = [
+    model.strip()
+    for model in os.getenv(
+        'GEMINI_MODELS',
+        'gemini-2.5-flash-lite,gemini-2.5-flash',
+    ).split(',')
+    if model.strip()
+]
+INSTAGRAM_APP_ID = os.getenv('INSTAGRAM_APP_ID', '').strip()
+INSTAGRAM_APP_SECRET = os.getenv('INSTAGRAM_APP_SECRET', '').strip()
+INSTAGRAM_REDIRECT_URI = os.getenv('INSTAGRAM_REDIRECT_URI', '').strip()
+INSTAGRAM_WEBHOOK_VERIFY_TOKEN = os.getenv('INSTAGRAM_WEBHOOK_VERIFY_TOKEN', '').strip()
 
 CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.dev']
+
+SECURE_SSL_REDIRECT = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https') if not DEBUG else None
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}

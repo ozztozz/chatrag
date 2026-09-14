@@ -1,19 +1,38 @@
+import hashlib
+import hmac
 import json
+import logging
 import time
 from google import genai
 from google.genai import errors  # Yeni SDK için doğru hata yönetimi
 import requests
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
-from .models import InstagramUser, InstagramMessage
+from .models import InstagramUser, InstagramMessage, MessageJob
 from google.genai import types
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.conf import settings
 
 
+logger = logging.getLogger(__name__)
+
+
 
 GEMINI_API_KEY = settings.GEMINI_API_KEY
 INSTAGRAM_ACCESS_TOKEN = settings.INSTAGRAM_ACCESS_TOKEN.strip()
+
+
+def has_valid_meta_signature(request):
+    signature = request.META.get('HTTP_X_HUB_SIGNATURE_256', '')
+    if not signature.startswith('sha256=') or not settings.INSTAGRAM_APP_SECRET:
+        return False
+
+    expected_signature = 'sha256=' + hmac.new(
+        settings.INSTAGRAM_APP_SECRET.encode('utf-8'),
+        request.body,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(signature, expected_signature)
 
 
 with staticfiles_storage.open('knowledge.txt') as f:
@@ -50,7 +69,7 @@ def get_old_messages(user_obj, limit=30):
 
     return eski_mesajlar
 
-def get_gemini_messages(user_obj, new_message, limit=30):
+def get_gemini_messages(user_obj, new_message, limit=30, additional_instruction=''):
     name = user_obj.name if user_obj.name else "Değerli Velimiz"
 
     # 1. Kullanıcıya hitap etme kuralını ekliyoruz
@@ -61,64 +80,57 @@ def get_gemini_messages(user_obj, new_message, limit=30):
 
     # 3. Hepsini ana PROMT değişkeninizle birleştiriyoruz
     final_system_instruction = PROMT + name_part + knowledge_part
+    if additional_instruction:
+        final_system_instruction += f"\n\n[Aktif Akış Adımı]\n{additional_instruction}"
 
     old_messages_data = get_old_messages(user_obj, limit=limit)
 
     client = genai.Client(api_key=GEMINI_API_KEY)
 
-    chat = client.chats.create(
-        model="gemini-2.5-flash-lite",
-        history=old_messages_data,
-        config=types.GenerateContentConfig(
-            system_instruction=final_system_instruction,
-            temperature=0.3
+    for model in settings.GEMINI_MODELS:
+        chat = client.chats.create(
+            model=model,
+            history=old_messages_data,
+            config=types.GenerateContentConfig(
+                system_instruction=final_system_instruction,
+                temperature=0.3
+            )
         )
-    )
 
-    response = None
-    for i in range(3):  # 3 deneme hakkı
-        try:
-            response = chat.send_message(new_message)
-
-            # Başarılı bir response aldık mı ve içinde text var mı? (Güvenlik filtresi kontrolü)
-            if response and getattr(response, 'text', None):
-                return response.text
-            else:
-                # Response döndü ama text yoksa (örn: Safety Block / Güvenlik engeli)
-                print(f"Deneme {i+1}: Boş veya filtrelenmiş yanıt alındı.")
-                chat.rewind()  # Boş turn'ü geçmişten silerek chat'i temiz tutuyoruz.
-
-        except errors.APIError as e:
-            # API tabanlı hatalar (Kota aşımı, 500 server hatası vb.)
-            print(f"Deneme {i+1} - Gemini API Hatası ({e.code}): {e.message}")
+        for attempt in range(3):
             try:
-                chat.rewind()  # Hata alan mesajı geçmişten geri al
+                response = chat.send_message(new_message)
+                if response and getattr(response, 'text', None):
+                    return response.text
+
+                logger.warning("Gemini model %s returned an empty response on attempt %s", model, attempt + 1)
+            except errors.APIError as error:
+                logger.error(
+                    "Gemini model %s failed on attempt %s (code=%s)",
+                    model,
+                    attempt + 1,
+                    error.code,
+                    exc_info=True,
+                )
             except Exception:
-                pass
+                logger.exception("Unexpected Gemini error for model %s on attempt %s", model, attempt + 1)
 
-            if i == 2:  # Son denemede de başarısız olduysa
-                return f"Error: {e.code} - {e.message}"
+            if attempt < 2:
+                time.sleep((attempt + 1) * 3)
 
-        except Exception as e:
-            # Diğer beklenmedik sistem/bağlantı hataları
-            print(f"Deneme {i+1} - Beklenmeyen hata: {e}")
-            try:
-                chat.rewind()
-            except Exception:
-                pass
-
-            if i == 2:
-                return "Üzgünüm, şu anda yanıt veremiyorum. (Sistem hatası)"
-
-        # Yeniden denemeden önce bekle (Exponential backoff mantığı: her adımda daha çok bekle)
-        time.sleep((i + 1) * 3)
-
-    # Döngü bitti ama yukarıdaki return'lere takılmadıysa (Nadir bir case)
-    return "Üzgünüm, şu anda yanıt veremiyorum."
+    logger.error("All configured Gemini models failed")
+    return None
 
 def get_instagram_user_info(instagram_id):
-    url = f"https://graph.instagram.com/v25.0/{instagram_id}?fields=name,username,is_user_follow_business&access_token=IGAATI8zcb86NBZAGFZAYVhSNExKb19IeE1tMmhBMU9uRU5WWWIzOUctVVRJWVByLTdLMEFHRGFBMjYyZA1l3Y0hKa3cxTkZAKWTB6V1laWkQ5UDZAmUUNKdHcwc29yb3pvZAVpxSmk1eWFKaG50WGhFZA1VIMGhkN1B5cThWcFdHTDU3WQZDZD"
-    response=requests.get(url)
+    url = f"https://graph.instagram.com/v25.0/{instagram_id}"
+    response = requests.get(
+        url,
+        params={
+            "fields": "name,username,is_user_follow_business",
+            "access_token": INSTAGRAM_ACCESS_TOKEN,
+        },
+        timeout=10,
+    )
     metadata=response.json()
     return metadata
 
@@ -126,14 +138,14 @@ def send_writing_indicator(sender_id):
     """Instagram'a yazıyor göstergesi gönderir"""
     url = "https://graph.instagram.com/v25.0/me/messages"
     headers = {
-        'Authorization': 'Bearer IGAATI8zcb86NBZAGE5R3IzNWpPc3pWbnE4aFBLSzM5NE5XdDhtWDRpSnNHRDYzUmJ0YUtRYjRIRzNnc1BXTnRMRlpSOGMxalJGck9LUktCV1ZAPcVFNWjhlY3dxS3VRWGlTejZASaEZA1aktCM1BCMldxUjQ2NlZAjVTRxM3puRUNZASQZDZD',
+        'Authorization': f'Bearer {INSTAGRAM_ACCESS_TOKEN}',
         'Content-Type': 'application/json'
     }
     payload = {
         "recipient": {"id": sender_id},
         "sender_action": "typing_on"
     }
-    response=requests.post(url,headers=headers,json=payload)
+    response = requests.post(url, headers=headers, json=payload, timeout=10)
 @csrf_exempt
 def instagram_webhook(request):
     # 1. DOĞRULAMA ADIMI (GET)
@@ -142,12 +154,15 @@ def instagram_webhook(request):
         token = request.GET.get('hub.verify_token')
         challenge = request.GET.get('hub.challenge')
 
-        if mode == 'subscribe' and token == 'fkalpha_academy_token' :
+        if mode == 'subscribe' and token == settings.INSTAGRAM_WEBHOOK_VERIFY_TOKEN:
             return HttpResponse(challenge, content_type="text/plain")
         return HttpResponse("Doğrulama başarısız", status=403)
 
     # 2. VERİ ALMA VE KAYDETME ADIMI (POST)
     elif request.method == 'POST':
+        if not has_valid_meta_signature(request):
+            return HttpResponse("Geçersiz webhook imzası", status=403)
+
         try:
             data = json.loads(request.body.decode('utf-8'))
         except json.JSONDecodeError:
@@ -166,37 +181,20 @@ def instagram_webhook(request):
                         recipient_id = messaging_event['recipient']['id']
 
                         # 1. Kural: Mesaj metni var mı ve botun kendi mesajı (echo) değil mi?
-                        if message_text and not message_data.get('is_echo'):
+                        if message_id and message_text and not message_data.get('is_echo'):
 
                             # KULLANICIYI KAYDET (Yoksa oluşturur, varsa mevcut olanı getirir)
                             user_obj, created = InstagramUser.objects.get_or_create(instagram_id=sender_id)
-                            try:
-                                user_info = get_instagram_user_info(sender_id)
-                                user_obj.name = user_info.get('name')
-                                user_obj.username = user_info.get('username')
-                                user_obj.is_user_follow_business = user_info.get('is_user_follow_business', False)
-                                user_obj.save()
-                            except Exception as e:
-                                pass
-                            if user_obj.is_user_follow_business:
-                                return HttpResponse("EVENT_RECEIVED", status=200) # Takip eden kullanıcılar için yanıt vermiyoruz
-
-
-                            # GELEN MESAJI KAYDET (Aynı message_id daha önce işlenmediyse)
-                            if not InstagramMessage.objects.filter(message_id=message_id).exists():
-                                send_writing_indicator(sender_id)
-                                # OTO YANIT METNİ
-                                reply_text = get_gemini_messages(user_obj, message_text)
-                                #reply_text = "Bu bir otomatik yanıttır. Mesajınız bize ulaştı ve en kısa sürede cevaplanacaktır."
-                                InstagramMessage.objects.create(
-                                    user=user_obj,
-                                    message_id=message_id,
-                                    text=message_text,
-                                    is_from_user=True
-                                )
-
-                                # API Üzerinden Yanıt Gönder ve Gönderilen Yanıtı da Veritabanına Yaz
-                                send_and_save_reply(user_obj, reply_text)
+                            incoming_message, created = InstagramMessage.objects.get_or_create(
+                                message_id=message_id,
+                                defaults={
+                                    'user': user_obj,
+                                    'text': message_text,
+                                    'is_from_user': True,
+                                },
+                            )
+                            if created:
+                                MessageJob.objects.get_or_create(message=incoming_message)
 
         return HttpResponse("EVENT_RECEIVED", status=200)
 
@@ -210,7 +208,7 @@ import re
 def send_and_save_reply(user_obj, gemini_response):
     url = "https://graph.instagram.com/v25.0/me/messages"
     headers = {
-        'Authorization': 'Bearer IGAATI8zcb86NBZAGE5R3IzNWpPc3pWbnE4aFBLSzM5NE5XdDhtWDRpSnNHRDYzUmJ0YUtRYjRIRzNnc1BXTnRMRlpSOGMxalJGck9LUktCV1ZAPcVFNWjhlY3dxS3VRWGlTejZASaEZA1aktCM1BCMldxUjQ2NlZAjVTRxM3puRUNZASQZDZD',
+        'Authorization': f'Bearer {INSTAGRAM_ACCESS_TOKEN}',
         'Content-Type': 'application/json'
     }
 
@@ -265,7 +263,7 @@ def send_and_save_reply(user_obj, gemini_response):
 
     # Adım 4: Meta API'ye Gönderim ve Veritabanı Kaydı
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
         response_data = response.json()
 
         if "message_id" in response_data:
@@ -278,9 +276,9 @@ def send_and_save_reply(user_obj, gemini_response):
             return True
         else:
             # Meta'dan dönen hatayı loglayın (Buton kısıtlamalarına takılıp takılmadığını görmek için)
-            print(f"Meta API Reddedildi: {response_data}")
+            logger.warning("Meta API rejected message with status %s", response.status_code)
             return False
 
     except requests.exceptions.RequestException as e:
-        print(f"Meta API Bağlantı Hatası: {e}")
+        logger.exception("Meta API connection error")
         return False

@@ -1,0 +1,5 @@
+Django==6.0.5
+requests==2.34.2
+python-dotenv==1.2.2
+google-genai==2.6.0
+langgraph==1.2.1

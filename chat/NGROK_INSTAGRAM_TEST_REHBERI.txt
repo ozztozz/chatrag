@@ -1,0 +1,374 @@
+`ALPHA ACADEMY - NGROK VE INSTAGRAM TEST REHBERI
+================================================
+
+
+
+s'fre Alpha.123!
+
+Bu rehber, Django uygulamasini yerel bilgisayarda calistirip ngrok ile Instagram/Meta uzerinden test etmek icindir.
+
+ONEMLI GUVENLIK NOTU
+--------------------
+Bu projedeki .env degerleri sohbet ve editor ekraninda gorundu. Asagidaki bilgileri Meta, Google ve ngrok panellerinden yenilemeden test yapma:
+
+- Instagram App Secret
+- Instagram Access Token
+- Gemini API Key
+- ngrok Auth Token
+- Django SECRET_KEY
+
+Asagidaki komutlarda gercek secret veya token yazma. Sadece kendi .env dosyana ekle.
+
+
+1. PROJE KLASORUNE GIR
+----------------------
+PowerShell ac ve su komutlari calistir:
+
+cd C:\Users\USER\Desktop\chatrag\chat
+..\my_env\Scripts\Activate.ps1
+
+Virtual environment aktif oldugunda komut satirinin basinda genellikle (my_env) gorunur.
+
+
+2. .ENV DOSYASINI HAZIRLA
+--------------------------
+C:\Users\USER\Desktop\chatrag\chat\.env dosyasini ac ve asagidaki alanlari kendi yenilenmis degerlerinle doldur:
+
+DEBUG=False
+SECRET_KEY=yeni-django-secret-key
+ALLOWED_HOSTS=localhost,127.0.0.1
+
+INSTAGRAM_APP_ID=Meta-panelindeki-app-id
+INSTAGRAM_APP_SECRET=Meta-panelindeki-yeni-app-secret
+INSTAGRAM_REDIRECT_URI=https://NGROK_ADRESIN.ngrok-free.dev/auth/oauth/callback/
+INSTAGRAM_ACCESS_TOKEN=yenilenmis-access-token
+INSTAGRAM_WEBHOOK_VERIFY_TOKEN=kendin-belirledigin-webhook-token
+
+GEMINI_API_KEY=yenilenmis-gemini-api-key
+GEMINI_MODELS=gemini-2.5-flash-lite,gemini-2.5-flash
+NGROK_AUTH_TOKEN=yenilenmis-ngrok-token
+
+NGROK_ADRESIN yerine ngrok basladiktan sonra sana verilen adresi yazacaksin.
+Ornek:
+https://abc123.ngrok-free.dev/auth/oauth/callback/
+
+Dikkat:
+- URL sonunda / bulunmali.
+- Meta panelindeki callback URL ile .env icindeki URL birebir ayni olmali.
+- Her ngrok baslatmada adres degisirse .env ve Meta ayarlarini tekrar guncelle.
+
+
+3. VERITABANI MIGRATIONLARINI UYGULA
+-------------------------------------
+Proje klasorunde:
+
+python manage.py migrate
+python manage.py check
+
+Beklenen sonuc:
+- check komutu hata vermemeli.
+- MessageJob modeli icin migration uygulanmis olmali.
+
+
+4. DJANGO SUNUCUSUNU BASLAT
+----------------------------
+Ilk PowerShell penceresinde:
+
+python manage.py runserver 127.0.0.1:8000
+
+Bu pencereyi kapatma.
+
+Tarayicida su adresi kontrol et:
+
+http://127.0.0.1:8000/
+
+Uygulamanin ana sayfasi aciliyorsa Django yerel olarak calisiyor demektir.
+
+
+5. NGROK'U BASLAT
+-----------------
+Ikinci bir PowerShell penceresi ac.
+
+cd C:\Users\USER\Desktop\chatrag
+ngrok config add-authtoken YENI_NGROK_AUTH_TOKEN
+ngrok http 127.0.0.1:8000
+
+Not:
+- `ngrok http https://localhost:8000` kullanma; Django runserver HTTPS degil HTTP dinliyor.
+- `ngrok tcp 8000` kullanma; Instagram/Meta icin HTTP tunnel gereklidir.
+- Yerel tarayicida `http://127.0.0.1:8000/`, Instagram testinde ise ngrok'un verdigi `https://...ngrok-free.dev/` adresini kullan.
+
+Eger auth token daha once ayarlandiysa sadece su komut yeterlidir:
+
+ngrok http 8000
+
+Ngrok ekraninda su sekilde bir Forwarding adresi gorursun:
+
+https://abc123.ngrok-free.dev -> http://localhost:8000
+
+Bu HTTPS adresini kopyala.
+
+Tarayicida kontrol et:
+
+https://abc123.ngrok-free.dev/
+
+Sayfa aciliyorsa ngrok ve Django baglantisi calisiyor.
+
+
+6. .ENV'DEKI CALLBACK ADRESINI GUNCELLE
+----------------------------------------
+.env icindeki satiri ngrok adresine gore degistir:
+
+INSTAGRAM_REDIRECT_URI=https://abc123.ngrok-free.dev/auth/oauth/callback/
+
+Django sunucusunu durdurup tekrar baslat:
+
+CTRL+C
+python manage.py runserver 127.0.0.1:8000
+
+Bu gereklidir; ayar dosyasi yeniden yuklensin.
+
+
+7. META DEVELOPER PANELINI HAZIRLA
+-----------------------------------
+Meta for Developers paneline gir:
+
+https://developers.facebook.com/
+
+Ilgili uygulamayi sec ve su kontrolleri yap:
+
+A) App ID
+- INSTAGRAM_APP_ID degeri ile ayni olmali.
+
+B) OAuth redirect URI
+- Instagram Login veya ilgili OAuth ayarlarinda callback adresini ekle:
+
+https://abc123.ngrok-free.dev/auth/oauth/callback/
+
+- Adresin sonunda / oldugunu kontrol et.
+- .env ve Meta panelindeki adres karakter karakter ayni olmali.
+
+C) Instagram izinleri
+Uygulamanin kullandigi izinlerin Meta panelinde onayli veya test icin uygun oldugunu kontrol et.
+Projede kullanilan izinler:
+
+instagram_business_basic
+instagram_business_manage_messages
+instagram_business_manage_comments
+instagram_business_content_publish
+instagram_business_manage_insights
+
+Meta panelindeki urun ve izin adlari hesap tipine gore degisebilir. Bir izin reddedilirse OAuth kodu tokena donusmeyebilir.
+
+D) Webhook ayarlari
+Webhook callback URL olarak su adresi kullan:
+
+https://abc123.ngrok-free.dev/instagram/webhook/
+
+Verify Token olarak .env icindeki degerin aynisini gir:
+
+INSTAGRAM_WEBHOOK_VERIFY_TOKEN=buradaki-deger
+
+Meta paneli dogrulama isterse Save/Verify butonuna bas.
+
+Uygulama GET istegini alir ve token dogruysa challenge degerini geri doner.
+
+
+8. TEST INSTAGRAM HESAPLARINI HAZIRLA
+--------------------------------------
+Gercek hesabinla test etmeden once Meta test kullanicilarini kullan.
+
+A) Test hesabi ekle
+Meta Developer panelinde genellikle:
+
+App Roles / Roller / Test Users
+
+veya
+
+Instagram Testers
+
+bolumlerinden test Instagram hesabini ekle.
+
+B) Test hesabinda daveti kabul et
+Test Instagram hesabiyla Instagram uygulamasina veya web sitesine gir.
+Gelen tester davetini kabul et.
+
+Davet kabul edilmeden OAuth girisi ve mesaj testleri calismayabilir.
+
+C) Hesap turunu kontrol et
+Mesajlasma ve business izinleri icin Instagram hesabinin Meta tarafinda desteklenen hesap turunde olmasi gerekebilir. Gerekirse hesabi Professional/Business hesaba cevir ve bir Facebook sayfasi veya Business Manager baglantisini Meta gereksinimlerine gore tamamla.
+
+D) Uygulama gelistirme modunda kalabilir
+Test kullanicilariyla deneme yaparken uygulamayi Live yapmak zorunda olmayabilirsin. Test hesaplari uygulama rollerine eklenmis ve daveti kabul etmis olmali.
+
+
+9. OAUTH GIRIS TESTI
+--------------------
+Tarayicida su adrese git:
+
+https://abc123.ngrok-free.dev/auth/oauth/login/
+
+Beklenen davranis:
+1. Instagram/Meta giris ekrani acilir.
+2. Test hesabi ile giris yapilir.
+3. Uygulama izinleri onaylanir.
+4. Meta callback adresine geri doner.
+5. Uygulama basariliysa sadece genel bir basari cevabi doner.
+
+Hata olursa:
+- Callback URL birebir ayni mi kontrol et.
+- .env icindeki INSTAGRAM_APP_ID ve INSTAGRAM_APP_SECRET yeni mi kontrol et.
+- Test hesabi daveti kabul etti mi kontrol et.
+- Django terminalindeki logu incele.
+- Ngrok penceresindeki HTTP isteklerini incele.
+
+OAuth akisi state korumasi kullandigi icin callback adresini elle code parametresiyle acmak basarili olmaz. Login akisini her zaman /auth/oauth/login/ adresinden baslat.
+
+
+10. WEBHOOK DOGRULAMA TESTI
+---------------------------
+Meta panelinde webhook Verify/Save yaptiginda Django terminalinde GET istegi gorunmeli.
+
+Webhook adresi:
+
+https://abc123.ngrok-free.dev/instagram/webhook/
+
+Dogrulama basariliysa Meta paneli kabul eder.
+
+POST webhook istekleri X-Hub-Signature-256 imzasi olmadan reddedilir. Bu nedenle elle Postman/curl ile imzasiz POST gonderirsen 403 alman normaldir.
+
+
+11. INSTAGRAM MESAJ TESTI
+-------------------------
+Test hesabi ile bot hesabina veya bagli Instagram hesabina DM gonder.
+
+Beklenen akis:
+1. Instagram mesaji Meta webhook'a gonderir.
+2. Django webhook mesaji InstagramMessage tablosuna kaydeder.
+3. MessageJob tablosuna pending bir is ekler.
+4. Webhook hizli sekilde EVENT_RECEIVED cevabi doner.
+5. Mesaj henuz cevaplanmadiysa bu normaldir; cevap kuyruk worker'i ile uretilir.
+
+
+12. KUYRUGU MANUEL CALISTIR
+---------------------------
+Ngrok ve Django acik kalacak sekilde ucuncu bir PowerShell penceresi ac:
+
+cd C:\Users\USER\Desktop\chatrag\chat
+..\my_env\Scripts\Activate.ps1
+python manage.py process_message_queue --limit 5
+
+Beklenen sonuc ornegi:
+
+Processed 1 message job(s).
+
+Eger su sonucu gorursen:
+
+Processed 0 message job(s).
+
+kuyruk bos demektir veya webhook henuz mesaji kaydetmemistir.
+
+Sonucu kontrol etmek icin tekrar mesaj gonder ve komutu yeniden calistir.
+
+
+13. OTOMATIK TEST ICIN DONGU
+----------------------------
+Yerel testte Scheduled Task yerine komutu elle tekrar tekrar calistirabilirsin:
+
+python manage.py process_message_queue --limit 5
+
+Her Instagram mesaji sonrasi bu komutu calistir.
+
+PythonAnywhere'de ise Scheduled Task komutu su sekilde olur:
+
+cd /home/kullanici_adin/chatrag/chat && /home/kullanici_adin/chatrag/venv/bin/python manage.py process_message_queue --limit 5
+
+
+14. VERITABANINI KONTROL ET
+----------------------------
+Django shell ile kuyruk durumlarini kontrol edebilirsin:
+
+python manage.py shell
+
+Shell icinde:
+
+from main.models import InstagramMessage, MessageJob
+InstagramMessage.objects.order_by('-timestamp')[:5]
+MessageJob.objects.values('id', 'status', 'attempts', 'last_error')
+
+Durumlar:
+- pending: Islenmeyi bekliyor
+- processing: Worker isliyor
+- completed: Basarili
+- failed: Uc denemeden sonra basarisiz
+
+Shell'den cikmak icin:
+
+exit()
+
+
+15. SIK KARSILASILAN HATALAR
+-----------------------------
+
+400 - Gecersiz OAuth state degeri
+- Login akisini callback URL'sinden elle baslatmissin.
+- /auth/oauth/login/ adresinden yeniden baslat.
+- Tarayici cookie/session bilgilerini silip tekrar dene.
+
+403 - Gecersiz webhook imzasi
+- Elle gonderilen POST isteginde Meta imzasi yoktur.
+- Meta'dan gelen gercek webhook istegiyle test et.
+
+403 - Webhook dogrulama basarisiz
+- Meta Verify Token ile .env INSTAGRAM_WEBHOOK_VERIFY_TOKEN farkli.
+- Verify Token'i karakter karakter ayni yap.
+
+Redirect URI mismatch
+- Meta callback adresi ile INSTAGRAM_REDIRECT_URI ayni degil.
+- Ngrok adresi degismis olabilir.
+
+Instagram token alinamadi
+- App Secret eski veya yanlis olabilir.
+- Test hesabi uygulama rolunde olmayabilir.
+- Izinler hesap turuyle uyusmuyor olabilir.
+
+Mesaj geliyor ama cevap gitmiyor
+- Webhook mesaji pending olarak kaydetmistir.
+- process_message_queue komutunu calistir.
+- Gemini loglarini ve Instagram API hata loglarini kontrol et.
+- INSTAGRAM_ACCESS_TOKEN yenilenmis ve dogru mu kontrol et.
+
+Gemini cevap vermiyor
+- GEMINI_API_KEY yenilenmis mi kontrol et.
+- GEMINI_MODELS icindeki model isimleri API hesabinda destekleniyor mu kontrol et.
+- Queue job pending veya failed durumuna bak.
+
+Ngrok ERR_NGROK_3200 veya baglanti yok
+- Django runserver hala calisiyor mu kontrol et.
+- ngrok'un 8000 portunu yonlendirdigini kontrol et.
+- Windows Firewall veya ag baglantisini kontrol et.
+
+
+16. TEST BITINCE
+----------------
+1. Django ve ngrok terminallerinde CTRL+C ile servisleri durdur.
+2. Test tokenlarini ve gecici ngrok adresini kullanmaya devam etme.
+3. Meta, Google ve ngrok tokenlarini rotasyon planina gore yenile.
+4. .env dosyasini Git'e ekleme.
+5. Gercek kullanici testinden once webhook ve queue loglarini kontrol et.
+
+
+KULLANILAN UYGULAMA ADRESLERI
+-----------------------------
+OAuth baslatma:
+/auth/oauth/login/
+
+OAuth callback:
+/auth/oauth/callback/
+
+Instagram webhook:
+/instagram/webhook/
+
+Kuyruk komutu:
+python manage.py process_message_queue --limit 5
+`
