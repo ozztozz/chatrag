@@ -16,6 +16,14 @@ class InstagramUser(models.Model):
 class InstagramMessage(models.Model):
     # Mesajı gönderen kullanıcı ile ilişki
     user = models.ForeignKey(InstagramUser, on_delete=models.CASCADE, related_name='messages')
+    # Mesajın geldiği bağlı Instagram işletme hesabı ve kullanılacak OAuth tokenı
+    account = models.ForeignKey(
+        'authInstagram.UserAccount',
+        on_delete=models.CASCADE,
+        related_name='messages',
+        null=True,
+        blank=True,
+    )
     # Mesajın benzersiz Meta ID'si (Aynı mesajın tekrar kaydedilmesini önler)
     message_id = models.CharField(max_length=255, unique=True)
     # Mesaj içeriği

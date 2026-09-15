@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 
+from authInstagram.models import UserAccount
 from .models import InstagramMessage, InstagramUser, MessageJob
 from .views import get_gemini_messages
 from .conversation_graph import conversation_graph
@@ -45,6 +46,10 @@ class InstagramWebhookSignatureTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 
 	def test_webhook_queues_incoming_message(self):
+		account = UserAccount.objects.create(
+			instagram_user_id='business-1',
+			access_token='oauth-token',
+		)
 		body = b'{"object":"instagram","entry":[{"messaging":[{"sender":{"id":"sender-1"},"recipient":{"id":"business-1"},"message":{"mid":"mid-1","text":"Merhaba"}}]}]}'
 		signature = hmac.new(b'test-app-secret', body, hashlib.sha256).hexdigest()
 
@@ -57,6 +62,7 @@ class InstagramWebhookSignatureTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		message = InstagramMessage.objects.get(message_id='mid-1')
+		self.assertEqual(message.account, account)
 		self.assertTrue(MessageJob.objects.filter(message=message, status=MessageJob.STATUS_PENDING).exists())
 
 

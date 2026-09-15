@@ -8,6 +8,7 @@ from main.models import MessageJob
 from main.conversation_graph import generate_conversation_response
 from main.views import (
     get_instagram_user_info,
+    InstagramTokenError,
     send_and_save_reply,
     send_writing_indicator,
 )
@@ -31,6 +32,7 @@ class Command(BaseCommand):
         for _ in range(limit):
             with transaction.atomic():
                 job = (MessageJob.objects.select_for_update().select_related('message__user')
+                      .select_related('message__account')
                        .filter(status=MessageJob.STATUS_PENDING)
                        .order_by('updated_at')
                        .first())
@@ -49,9 +51,15 @@ class Command(BaseCommand):
     def process_job(self, job):
         message = job.message
         user = message.user
+        account = message.account
         try:
+            if not account:
+                raise RuntimeError('Message is not linked to a connected Instagram account')
+            if not account.is_active or account.token_is_expired():
+                raise InstagramTokenError('Instagram access token is expired or inactive')
+
             try:
-                user_info = get_instagram_user_info(user.instagram_id)
+                user_info = get_instagram_user_info(user.instagram_id, account.access_token)
                 user.name = user_info.get('name')
                 user.username = user_info.get('username')
                 user.is_user_follow_business = user_info.get('is_user_follow_business', False)
@@ -66,17 +74,26 @@ class Command(BaseCommand):
                 job.save(update_fields=['status', 'locked_at', 'updated_at'])
                 return
 
-            send_writing_indicator(user.instagram_id)
+            send_writing_indicator(user.instagram_id, account.access_token)
             reply_text = generate_conversation_response(user, message.text)
             if not reply_text:
                 raise RuntimeError('All Gemini models failed to generate a response')
-            if not send_and_save_reply(user, reply_text):
+            if not send_and_save_reply(user, reply_text, account.access_token):
                 raise RuntimeError('Instagram reply was rejected')
 
             job.status = MessageJob.STATUS_COMPLETED
             job.locked_at = None
             job.last_error = ''
             job.save(update_fields=['status', 'locked_at', 'last_error', 'updated_at'])
+        except InstagramTokenError as exc:
+            account.is_active = False
+            account.token_error = str(exc)[:2000]
+            account.save(update_fields=['is_active', 'token_error'])
+            job.status = MessageJob.STATUS_FAILED
+            job.locked_at = None
+            job.last_error = str(exc)[:2000]
+            job.save(update_fields=['status', 'locked_at', 'last_error', 'updated_at'])
+            self.stderr.write(f'Job {job.pk} failed: {exc}')
         except Exception as exc:
             job.status = (
                 MessageJob.STATUS_FAILED

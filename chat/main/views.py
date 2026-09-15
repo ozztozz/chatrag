@@ -12,14 +12,18 @@ from .models import InstagramUser, InstagramMessage, MessageJob
 from google.genai import types
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.conf import settings
+from authInstagram.models import UserAccount
 
 
 logger = logging.getLogger(__name__)
 
 
+class InstagramTokenError(Exception):
+    """Raised when Meta rejects the access token."""
+
+
 
 GEMINI_API_KEY = settings.GEMINI_API_KEY
-INSTAGRAM_ACCESS_TOKEN = settings.INSTAGRAM_ACCESS_TOKEN.strip()
 
 
 def has_valid_meta_signature(request):
@@ -121,24 +125,27 @@ def get_gemini_messages(user_obj, new_message, limit=30, additional_instruction=
     logger.error("All configured Gemini models failed")
     return None
 
-def get_instagram_user_info(instagram_id):
+def get_instagram_user_info(instagram_id, access_token):
     url = f"https://graph.instagram.com/v25.0/{instagram_id}"
     response = requests.get(
         url,
         params={
             "fields": "name,username,is_user_follow_business",
-            "access_token": INSTAGRAM_ACCESS_TOKEN,
+            "access_token": access_token,
         },
         timeout=10,
     )
-    metadata=response.json()
+    metadata = response.json()
+    if response.status_code in (401, 403) or metadata.get('error', {}).get('code') in (190, 463, 467):
+        raise InstagramTokenError('Instagram access token was rejected')
+    response.raise_for_status()
     return metadata
 
-def send_writing_indicator(sender_id):
+def send_writing_indicator(sender_id, access_token):
     """Instagram'a yazıyor göstergesi gönderir"""
     url = "https://graph.instagram.com/v25.0/me/messages"
     headers = {
-        'Authorization': f'Bearer {INSTAGRAM_ACCESS_TOKEN}',
+        'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
     payload = {
@@ -146,6 +153,8 @@ def send_writing_indicator(sender_id):
         "sender_action": "typing_on"
     }
     response = requests.post(url, headers=headers, json=payload, timeout=10)
+    if response.status_code in (401, 403):
+        raise InstagramTokenError('Instagram access token was rejected')
 @csrf_exempt
 def instagram_webhook(request):
     # 1. DOĞRULAMA ADIMI (GET)
@@ -178,10 +187,21 @@ def instagram_webhook(request):
                         message_data = messaging_event['message']
                         message_id = message_data.get('mid') # Meta'nın verdiği benzersiz mesaj ID'si
                         message_text = message_data.get('text')
-                        recipient_id = messaging_event['recipient']['id']
+                        recipient_id = messaging_event.get('recipient', {}).get('id')
+                        entry_account_id = entry.get('id')
 
                         # 1. Kural: Mesaj metni var mı ve botun kendi mesajı (echo) değil mi?
                         if message_id and message_text and not message_data.get('is_echo'):
+                            account = UserAccount.objects.filter(
+                                instagram_user_id__in=[recipient_id, entry_account_id]
+                            ).first()
+                            if not account:
+                                logger.warning(
+                                    "Ignoring message %s for unconnected Instagram account %s",
+                                    message_id,
+                                    recipient_id,
+                                )
+                                continue
 
                             # KULLANICIYI KAYDET (Yoksa oluşturur, varsa mevcut olanı getirir)
                             user_obj, created = InstagramUser.objects.get_or_create(instagram_id=sender_id)
@@ -189,11 +209,15 @@ def instagram_webhook(request):
                                 message_id=message_id,
                                 defaults={
                                     'user': user_obj,
+                                    'account': account,
                                     'text': message_text,
                                     'is_from_user': True,
                                 },
                             )
-                            if created:
+                            if not created and incoming_message.account_id is None:
+                                incoming_message.account = account
+                                incoming_message.save(update_fields=['account'])
+                            if created or incoming_message.account_id == account.id:
                                 MessageJob.objects.get_or_create(message=incoming_message)
 
         return HttpResponse("EVENT_RECEIVED", status=200)
@@ -205,10 +229,10 @@ def instagram_webhook(request):
 import re
 
 
-def send_and_save_reply(user_obj, gemini_response):
+def send_and_save_reply(user_obj, gemini_response, access_token):
     url = "https://graph.instagram.com/v25.0/me/messages"
     headers = {
-        'Authorization': f'Bearer {INSTAGRAM_ACCESS_TOKEN}',
+        'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
 
@@ -265,6 +289,9 @@ def send_and_save_reply(user_obj, gemini_response):
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=10)
         response_data = response.json()
+
+        if response.status_code in (401, 403) or response_data.get('error', {}).get('code') in (190, 463, 467):
+            raise InstagramTokenError('Instagram access token was rejected')
 
         if "message_id" in response_data:
             InstagramMessage.objects.create(
